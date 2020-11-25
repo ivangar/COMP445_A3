@@ -13,7 +13,7 @@ import java.nio.ByteOrder;
 public class Packet {
 
     public static final int MIN_LEN = 11;
-    public static final int MAX_LEN = 11 + 1024;
+    public static final int MAX_LEN = 11 + 1013;
 
     private final int type;
     private final long sequenceNumber;
@@ -67,6 +67,7 @@ public class Packet {
      * Writes a raw presentation of the packet to byte buffer.
      * The order of the buffer should be set as BigEndian.
      */
+    // position?
     private void write(ByteBuffer buf) {
         buf.put((byte) type);
         buf.putInt((int) sequenceNumber);

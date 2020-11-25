@@ -7,6 +7,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.DatagramChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
@@ -41,6 +43,18 @@ public class UDPServer {
                     // The peer address of the packet is the address of the client already.
                     // We can use toBuilder to copy properties of the current packet.
                     // This demonstrate how to create a new packet from an existing packet.
+//                    Packet resp = createPacket(packet, payload, packet.getSequenceNumber()+1, PacketType.DATA.getValue());
+//                    channel.send(resp.toBuffer(), routerAddress);
+
+                    Timer timer = new Timer();
+                    TimerTask task = new TimerTask() {
+                        @Override
+                        public void run() {
+
+                        }
+                    };
+                    timer.schedule(task, 0, 2000);
+
                     Packet resp = createPacket(packet, payload, packet.getSequenceNumber()+1, PacketType.DATA.getValue());
                     channel.send(resp.toBuffer(), routerAddress);
                 }

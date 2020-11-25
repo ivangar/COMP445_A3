@@ -10,6 +10,8 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -32,6 +34,7 @@ public class UDPClient {
                 String msg = "Hello World";
                 Packet p = createPacket(msg, PacketType.ACK.getValue());
                 channel.send(p.toBuffer(), routerAddress);
+                // get request starts
                 Packet resp = receivePacket(channel);
                 System.out.println("Response is :"+new String(resp.getPayload(), UTF_8));
             }
@@ -90,7 +93,6 @@ public class UDPClient {
         channel.send(packet1.toBuffer(), routerAddress);
 
         Packet server_packet = receivePacket(channel);
-
         //Handshake step 3
         if(server_packet.getType() == PacketType.SYN_ACK.getValue()) {
             String payload = new String(server_packet.getPayload(), UTF_8);
