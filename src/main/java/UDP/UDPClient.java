@@ -31,12 +31,26 @@ public class UDPClient {
                 handShake(channel);
 
             if(connection_established){
-                String msg = "Hello World";
-                Packet p = createPacket(msg, PacketType.ACK.getValue());
+                //TEST Get contents of /test.txt
+                String msg = "/jsonFile.json";
+                Packet p = createPacket(msg, PacketType.DATA.getValue());
                 channel.send(p.toBuffer(), routerAddress);
-                // get request starts
                 Packet resp = receivePacket(channel);
-                System.out.println("Response is :"+new String(resp.getPayload(), UTF_8));
+                StringBuilder response = new StringBuilder();
+                int packet_number = 1;
+
+                while(resp.getType() != PacketType.FIN.getValue()){
+                    String server_response = new String(resp.getPayload(), UTF_8);
+                    //System.out.println("\n\nPacket payload is :\n" + server_response);
+                    System.out.println("\nPacket # is :" + packet_number);
+                    response.append(server_response);
+                    resp = receivePacket(channel);
+                    packet_number++;
+                }
+
+
+                System.out.println("\n---------Server response for Get file contents-----------\n" + response);
+
             }
         }
     }
@@ -96,9 +110,11 @@ public class UDPClient {
         //Handshake step 3
         if(server_packet.getType() == PacketType.SYN_ACK.getValue()) {
             String payload = new String(server_packet.getPayload(), UTF_8);
-            System.out.println("Server SYN_ACK response : " + payload + " \nACK # " + server_packet.getSequenceNumber());
+            System.out.println("Server SYN_ACK response : " + payload);
             connection_established = true;
             sequence_number = server_packet.getSequenceNumber() + 1;
+            Packet ack_packet = createPacket(String.valueOf(server_packet.getSequenceNumber()), PacketType.ACK.getValue());
+            channel.send(ack_packet.toBuffer(), routerAddress);
         }
     }
 
