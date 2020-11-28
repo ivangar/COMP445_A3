@@ -8,9 +8,7 @@ import java.nio.ByteOrder;
 import java.nio.channels.DatagramChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.Arrays;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
@@ -61,11 +59,12 @@ public class UDPServer {
                     }
 
                     else{
-                       byte[][] payloads = getPayloads(responseBytes, (Packet.MAX_LEN-11));
-                       long seq_no = packet.getSequenceNumber()+1;
-                        for(int i = 0; i < payloads.length; i++) {
-                            String payload = new String(payloads[i], UTF_8);
-                            Packet resp = createPacket(packet, payload, seq_no, PacketType.DATA.getValue());
+                        List<byte[]> payloads = getPayloads(responseBytes, (Packet.MAX_LEN-11));
+                        long seq_no = packet.getSequenceNumber()+1;
+
+                        for (byte[] payload : payloads) {
+                            String payload_data = new String(payload, UTF_8);
+                            Packet resp = createPacket(packet, payload_data, seq_no, PacketType.DATA.getValue());
                             channel.send(resp.toBuffer(), routerAddress);
                             Packet new_packet = receivePacket(buf, channel);
                             if(new_packet.getType() == PacketType.ACK.getValue())
@@ -80,7 +79,7 @@ public class UDPServer {
 
                     //This section is to test POST, to test GET comment this section and uncomment GET section
                     //POST some random text to post/post.txt
-                    /*
+/*
                     String client_post_request = new String(packet.getPayload(), UTF_8);
                     StringBuilder response = new StringBuilder();
                     entity_body.append(client_post_request);
@@ -91,7 +90,7 @@ public class UDPServer {
 
                     if(packet.getType() == PacketType.FIN.getValue())
                         processPostRequest("post/post.txt", entity_body, response);
-                     */
+*/
                     /*
                     Timer timer = new Timer();
                     TimerTask task = new TimerTask() {
@@ -109,15 +108,15 @@ public class UDPServer {
         }
     }
 
-    public static byte[][] getPayloads(byte[] response, int payload_size) {
+    public static List<byte[]> getPayloads(byte[] response, int payload_size) {
 
-        byte[][] payloads = new byte[(int)Math.ceil(response.length / (double)payload_size)][payload_size];
-
+        List<byte[]> payloads = new ArrayList<byte[]>();
         int offset = 0;
 
-        for(int i = 0; i < payloads.length; i++) {
-            payloads[i] = Arrays.copyOfRange(response,offset, offset + payload_size);
-            offset += payload_size ;
+        while (offset < response.length) {
+            int end = Math.min(response.length, offset + payload_size);
+            payloads.add(Arrays.copyOfRange(response, offset, end));
+            offset += payload_size;
         }
 
         return payloads;

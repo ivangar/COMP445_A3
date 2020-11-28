@@ -9,10 +9,7 @@ import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -35,7 +32,7 @@ public class UDPClient {
                 //This section is to test GET, to test POST comment this section and uncomment Post section
                 //Get contents of /docs
 
-                String msg = "/docs/jsonFile.json";
+                String msg = "/docs/textfile.txt";
                 sequence_number++;
                 Packet p = createPacket(msg, PacketType.DATA.getValue());
                 channel.send(p.toBuffer(), routerAddress);
@@ -55,8 +52,16 @@ public class UDPClient {
 
 
                 //This section is to test POST, to test GET comment this section and uncomment GET section
-                /**
-                String msg = "Post new content to the file";
+/**
+                //String msg = "Post new content to the file";
+                String msg = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum interdum, risus at dictum sodales, odio elit consequat tortor, sit amet dignissim ligula eros sed elit. Phasellus id felis a lorem placerat lobortis. Vivamus ultrices quam vitae ipsum semper laoreet. Nam suscipit magna quis tellus accumsan, a dapibus dui vehicula. Cras laoreet fringilla sem id pellentesque. Donec eget tellus scelerisque, convallis massa nec, dignissim ex. Pellentesque venenatis, lacus sed pretium elementum, odio libero pretium massa, eget aliquet felis tortor vitae leo. Duis et venenatis nisl, eget fringilla turpis. Fusce sagittis massa at malesuada consequat.\n" +
+                        "\n" +
+                        "Duis urna lorem, vehicula ac tellus eu, mattis consectetur massa. Nulla facilisi. Sed et fringilla eros. Phasellus quis lacinia eros. Praesent pharetra eu turpis sed tincidunt. Curabitur semper malesuada purus sed egestas. Cras euismod lobortis dui, eget tincidunt dui dignissim in. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Pellentesque ullamcorper sed elit nec dapibus. Cras condimentum urna vitae fermentum finibus. Sed elit leo, euismod id posuere vel, ultrices nec mi. Sed felis risus, dignissim in dolor ac, ultrices consequat mauris. Nam orci libero, rhoncus ut odio a, efficitur tincidunt enim. Aenean vehicula, nulla id placerat rhoncus, arcu dolor congue mi, nec rutrum nisi urna vitae risus. Etiam cursus vulputate dolor sit amet lobortis. Vivamus a dictum mi, eu tincidunt tortor.\n" +
+                        "\n" +
+                        "Cras ut dolor eu mi interdum tempor et at enim. In posuere orci at ultrices sagittis. Nullam id diam mattis, viverra elit a, pellentesque nisi. Fusce sollicitudin eget erat mattis egestas. Suspendisse bibendum non elit ac condimentum. Nam blandit placerat ante vitae fermentum. Cras sit amet finibus dui, eget hendrerit purus. Nunc rhoncus mattis elit at ultrices. Sed turpis dui, mattis non ligula sit amet, dapibus convallis quam. Maecenas eget erat quis diam sagittis lacinia. Nullam non ligula eu lacus efficitur dignissim. Ut vel dignissim ante. Donec non mi finibus, sodales felis dapibus, suscipit velit. Phasellus et magna auctor, venenatis neque at, rutrum massa." +
+                        "Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Maecenas nec pellentesque elit, sit amet venenatis lectus. Sed a sollicitudin diam, ut scelerisque velit. Etiam egestas tincidunt turpis laoreet venenatis. Duis convallis tempor lectus et feugiat. Vestibulum in mauris viverra, ullamcorper sapien id, sollicitudin augue. Aenean finibus egestas magna, tempus imperdiet lectus laoreet ac. Mauris et rhoncus massa. Phasellus ullamcorper ligula sit amet ligula ornare rutrum. Donec egestas risus neque, at pulvinar justo ornare at. Vivamus convallis rhoncus eros, sit amet placerat nibh sagittis eget.\n" +
+                        "\n" +
+                        "Morbi molestie a sapien sed sollicitudin. Sed malesuada sit amet neque eget tincidunt. Morbi semper odio urna, ut faucibus velit pulvinar ut. Sed nulla magna, tempor quis egestas quis, laoreet non metus. Aenean ut mi mollis, dictum magna vitae, aliquam dui. Nunc in urna scelerisque, tincidunt turpis quis, sollicitudin nunc. Suspendisse non turpis ac ex imperdiet elementum et sit amet magna. Suspendisse aliquam dapibus orci, sed porttitor orci pretium vitae. Donec sit amet condimentum velit.";
                 sequence_number++;
 
                 byte[] responseBytes = msg.getBytes(UTF_8);
@@ -76,11 +81,11 @@ public class UDPClient {
                 }
 
                 else{
-                    byte[][] payloads = getPayloads(responseBytes, (Packet.MAX_LEN-11));
+                    List<byte[]> payloads = getPayloads(responseBytes, (Packet.MAX_LEN-11));
 
-                    for(int i = 0; i < payloads.length; i++) {
-                        String payload = new String(payloads[i], UTF_8);
-                        Packet resp = createPacket(payload, PacketType.DATA.getValue());
+                    for (byte[] payload : payloads) {
+                        String payload_data = new String(payload, UTF_8);
+                        Packet resp = createPacket(payload_data, PacketType.DATA.getValue());
                         System.out.println("\nSending Packet with Seq # :" + resp.getSequenceNumber());
                         channel.send(resp.toBuffer(), routerAddress);
 
@@ -94,7 +99,7 @@ public class UDPClient {
                     Packet fin_packet = createPacket("", PacketType.FIN.getValue());
                     channel.send(fin_packet.toBuffer(), routerAddress);
                 }
-                 */
+ */
             }
         }
     }
@@ -137,15 +142,15 @@ public class UDPClient {
         return packet;
     }
 
-    public static byte[][] getPayloads(byte[] response, int payload_size) {
+    public static List<byte[]> getPayloads(byte[] response, int payload_size) {
 
-        byte[][] payloads = new byte[(int)Math.ceil(response.length / (double)payload_size)][payload_size];
-
+        List<byte[]> payloads = new ArrayList<byte[]>();
         int offset = 0;
 
-        for(int i = 0; i < payloads.length; i++) {
-            payloads[i] = Arrays.copyOfRange(response,offset, offset + payload_size);
-            offset += payload_size ;
+        while (offset < response.length) {
+            int end = Math.min(response.length, offset + payload_size);
+            payloads.add(Arrays.copyOfRange(response, offset, end));
+            offset += payload_size;
         }
 
         return payloads;
