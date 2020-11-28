@@ -20,6 +20,7 @@ public class UDPServer {
     private static InetSocketAddress serverAddress;
     private static InetSocketAddress clientAddress;
     private boolean connection_established = false;
+    private StringBuilder entity_body = new StringBuilder();
     private Path root = Paths.get("").toAbsolutePath();  //default system current dir
 
     private void listenAndServe() throws IOException {
@@ -38,6 +39,9 @@ public class UDPServer {
                     handShake(packet ,channel);
                 }
                 else if(connection_established){
+                    //This section is to test GET, to test POST comment this section
+                    //Get contents of /docs
+
                     String client_get_request = new String(packet.getPayload(), UTF_8);
                     StringBuilder response = new StringBuilder();
                     processGetRequest(client_get_request, response);
@@ -46,22 +50,48 @@ public class UDPServer {
 
                     if(response.toString().getBytes().length <= (Packet.MAX_LEN-11)) {
                         Packet resp = createPacket(packet, response.toString(), packet.getSequenceNumber()+1, PacketType.DATA.getValue());
+                        System.out.println("\nSending Packet with Seq # :" + resp.getSequenceNumber());
                         channel.send(resp.toBuffer(), routerAddress);
+                        Packet new_packet = receivePacket(buf, channel);
+                        if(new_packet.getType() == PacketType.ACK.getValue())
+                            ack_packet(new_packet);
+
+                        Packet fin_packet = createPacket(packet, "", new_packet.getSequenceNumber()+1, PacketType.FIN.getValue());
+                        channel.send(fin_packet.toBuffer(), routerAddress);
                     }
 
                     else{
                        byte[][] payloads = getPayloads(responseBytes, (Packet.MAX_LEN-11));
-
+                       long seq_no = packet.getSequenceNumber()+1;
                         for(int i = 0; i < payloads.length; i++) {
                             String payload = new String(payloads[i], UTF_8);
-                            Packet resp = createPacket(packet, payload, packet.getSequenceNumber()+1, PacketType.DATA.getValue());
+                            Packet resp = createPacket(packet, payload, seq_no, PacketType.DATA.getValue());
                             channel.send(resp.toBuffer(), routerAddress);
+                            Packet new_packet = receivePacket(buf, channel);
+                            if(new_packet.getType() == PacketType.ACK.getValue())
+                                ack_packet(new_packet);
+                            seq_no = new_packet.getSequenceNumber()+1;
                         }
 
-                        Packet fin_packet = createPacket(packet, "", packet.getSequenceNumber()+1, PacketType.FIN.getValue());
+                        Packet fin_packet = createPacket(packet, "", seq_no, PacketType.FIN.getValue());
                         channel.send(fin_packet.toBuffer(), routerAddress);
                     }
 
+
+                    //This section is to test POST, to test GET comment this section and uncomment GET section
+                    //POST some random text to post/post.txt
+                    /*
+                    String client_post_request = new String(packet.getPayload(), UTF_8);
+                    StringBuilder response = new StringBuilder();
+                    entity_body.append(client_post_request);
+
+                    Packet ack_packet = createPacket(packet, "", packet.getSequenceNumber()+1, PacketType.ACK.getValue());
+                    System.out.println("\nSending Packet with Seq # :" + ack_packet.getSequenceNumber());
+                    channel.send(ack_packet.toBuffer(), routerAddress);
+
+                    if(packet.getType() == PacketType.FIN.getValue())
+                        processPostRequest("post/post.txt", entity_body, response);
+                     */
                     /*
                     Timer timer = new Timer();
                     TimerTask task = new TimerTask() {
@@ -93,6 +123,8 @@ public class UDPServer {
         return payloads;
     }
 
+    //THIS METHOD IS THE SAME FROM httpfsLibrary.java
+    //I USE IT HERE TO TEST GET
     private void processGetRequest(String requestPathLine, StringBuilder response){
         Path normalizePath = Paths.get(requestPathLine).normalize();
         String relativePath = normalizePath.toString();
@@ -138,6 +170,57 @@ public class UDPServer {
 
     }
 
+    //THIS METHOD IS THE SAME FROM httpfsLibrary.java
+    //I USE IT HERE TO TEST POST
+    private void processPostRequest(String requestPathLine, StringBuilder entity_body, StringBuilder response){
+        Path normalizePath = Paths.get(requestPathLine).normalize();
+        String relativePath = normalizePath.toString();
+
+        Path searchPath = Paths.get(root.toString(), relativePath);
+
+        // Either the file or directory exists
+        if (Files.exists(searchPath)){
+
+            // If it is a file, overwrite.
+            if(Files.isRegularFile(searchPath)){
+                try {
+                    if(Files.isWritable(searchPath)){
+                        byte[] content = entity_body.toString().getBytes();
+                        Files.write(searchPath, content);
+                        System.out.println("File is overwritten.");
+                        response.append("File is overwritten.\r\n");
+                    }else{
+                        response.append("File is read only.\r\n");
+                        System.out.println("File can be read only.");
+                    }
+
+
+                } catch (IOException exception) {
+                    exception.printStackTrace();
+                }
+            }
+
+            // If it is a directory, do nothing.
+            else{
+                response.append("This is a directory.\r\n");
+                System.out.println("It's a directory. So, it will not do anything.");
+            }
+        }
+
+        // If the file doesn't exist, create a text file.
+        else{
+            try {
+                Files.createDirectories(searchPath.getParent());
+                Files.createFile(searchPath);
+                byte[] content = entity_body.toString().getBytes();
+                Files.write(searchPath, content);
+                System.out.println("The file doesn't exist, so it creates a file.");
+            } catch (Exception exception) {
+                exception.printStackTrace();
+            }
+        }
+    }
+
     private void handShake(Packet packet, DatagramChannel channel) throws IOException {
 
         //Handshake step 2
@@ -155,12 +238,16 @@ public class UDPServer {
                 .order(ByteOrder.BIG_ENDIAN);
         Packet ack_packet = receivePacket(buf, channel);
         if(ack_packet.getType() == PacketType.ACK.getValue()) {
-            String ack_payload = new String(ack_packet.getPayload(), UTF_8);
-            System.out.println("Client ACK response : " + ack_payload);
+            ack_packet(ack_packet);
             connection_established = true;
+            System.out.println("\n---------Connection with client established---------\n\n");
         }
 
+    }
 
+    private void ack_packet(Packet client_packet) throws IOException {
+        String ack_payload = new String(client_packet.getPayload(), UTF_8);
+        System.out.println("Client ACK # : " + ack_payload);
     }
 
     private Packet createPacket(Packet packet, String message, long sequence_number, int type){
@@ -181,6 +268,8 @@ public class UDPServer {
         buf.flip();
         Packet packet = Packet.fromBuffer(buf);
         buf.flip();
+
+        System.out.println("Receiving client packet with Seq # : " + packet.getSequenceNumber());
 
         return packet;
     }
