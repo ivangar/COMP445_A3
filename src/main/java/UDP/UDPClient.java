@@ -9,6 +9,7 @@ import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -31,12 +32,69 @@ public class UDPClient {
                 handShake(channel);
 
             if(connection_established){
-                String msg = "Hello World";
-                Packet p = createPacket(msg, PacketType.ACK.getValue());
+                //This section is to test GET, to test POST comment this section and uncomment Post section
+                //Get contents of /docs
+
+                String msg = "/docs/jsonFile.json";
+                sequence_number++;
+                Packet p = createPacket(msg, PacketType.DATA.getValue());
                 channel.send(p.toBuffer(), routerAddress);
-                // get request starts
                 Packet resp = receivePacket(channel);
-                System.out.println("Response is :"+new String(resp.getPayload(), UTF_8));
+                StringBuilder response = new StringBuilder();
+
+                while(resp.getType() != PacketType.FIN.getValue()){
+                    String server_response = new String(resp.getPayload(), UTF_8);
+                    //System.out.println("\n\nPacket payload is :\n" + server_response);
+
+                    response.append(server_response);
+                    ack_packet(resp.getSequenceNumber(), channel);
+                    resp = receivePacket(channel);
+                }
+
+                System.out.println("\n---------Server response for Get file contents-----------\n" + response);
+
+
+                //This section is to test POST, to test GET comment this section and uncomment GET section
+                /**
+                String msg = "Post new content to the file";
+                sequence_number++;
+
+                byte[] responseBytes = msg.getBytes(UTF_8);
+                System.out.println("Length of Post message " + responseBytes.length);
+
+                if(msg.getBytes().length <= (Packet.MAX_LEN-11)) {
+                    Packet resp = createPacket(msg, PacketType.DATA.getValue());
+                    System.out.println("\nSending Packet with Seq # :" + resp.getSequenceNumber());
+                    channel.send(resp.toBuffer(), routerAddress);
+                    Packet new_packet = receivePacket(channel);
+                    if(new_packet.getType() == PacketType.ACK.getValue())
+                        System.out.println(" \nSeq # of received packet : " + new_packet.getSequenceNumber());
+
+                    sequence_number++;
+                    Packet fin_packet = createPacket("", PacketType.FIN.getValue());
+                    channel.send(fin_packet.toBuffer(), routerAddress);
+                }
+
+                else{
+                    byte[][] payloads = getPayloads(responseBytes, (Packet.MAX_LEN-11));
+
+                    for(int i = 0; i < payloads.length; i++) {
+                        String payload = new String(payloads[i], UTF_8);
+                        Packet resp = createPacket(payload, PacketType.DATA.getValue());
+                        System.out.println("\nSending Packet with Seq # :" + resp.getSequenceNumber());
+                        channel.send(resp.toBuffer(), routerAddress);
+
+                        Packet new_packet = receivePacket(channel);
+                        if(new_packet.getType() == PacketType.ACK.getValue())
+                            System.out.println(" \nSeq # of received packet : " + new_packet.getSequenceNumber());
+
+                        sequence_number++;
+                    }
+
+                    Packet fin_packet = createPacket("", PacketType.FIN.getValue());
+                    channel.send(fin_packet.toBuffer(), routerAddress);
+                }
+                 */
             }
         }
     }
@@ -75,7 +133,22 @@ public class UDPClient {
         Packet packet = Packet.fromBuffer(buf);
         buf.flip();
 
+        sequence_number++;
         return packet;
+    }
+
+    public static byte[][] getPayloads(byte[] response, int payload_size) {
+
+        byte[][] payloads = new byte[(int)Math.ceil(response.length / (double)payload_size)][payload_size];
+
+        int offset = 0;
+
+        for(int i = 0; i < payloads.length; i++) {
+            payloads[i] = Arrays.copyOfRange(response,offset, offset + payload_size);
+            offset += payload_size ;
+        }
+
+        return payloads;
     }
 
     private void handShake(DatagramChannel channel) throws IOException {
@@ -96,10 +169,17 @@ public class UDPClient {
         //Handshake step 3
         if(server_packet.getType() == PacketType.SYN_ACK.getValue()) {
             String payload = new String(server_packet.getPayload(), UTF_8);
-            System.out.println("Server SYN_ACK response : " + payload + " \nACK # " + server_packet.getSequenceNumber());
+            System.out.println("Server SYN_ACK response : " + payload);
             connection_established = true;
             sequence_number = server_packet.getSequenceNumber() + 1;
+            ack_packet(server_packet.getSequenceNumber(), channel);
         }
+    }
+
+    private void ack_packet(long seq_no, DatagramChannel channel) throws IOException {
+        System.out.println(" \nSeq # of received packet : " + seq_no);
+        Packet ack_packet = createPacket(String.valueOf(seq_no), PacketType.ACK.getValue());
+        channel.send(ack_packet.toBuffer(), routerAddress);
     }
 
     public static void main(String[] args) throws IOException {

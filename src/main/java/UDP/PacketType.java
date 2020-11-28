@@ -7,7 +7,8 @@ public enum PacketType {
     DATA(0),
     ACK(1),
     SYN(2),
-    SYN_ACK(3);
+    SYN_ACK(3),
+    FIN(4);
 
     private int value;
     private static Map map = new HashMap<>();
