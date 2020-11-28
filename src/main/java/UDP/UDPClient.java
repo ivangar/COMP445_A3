@@ -9,10 +9,7 @@ import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 
 import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -161,18 +158,21 @@ public class UDPClient {
         sequence_number = 1L;
 
         Packet packet1 = createPacket(helloMessage, PacketType.SYN.getValue());
-
         System.out.println("Sending SYN message with sequence number " + sequence_number);
-        channel.send(packet1.toBuffer(), routerAddress);
 
+        // Sending SYN and get SYN_ACK from the server.
+        sends(channel, packet1);
         Packet server_packet = receivePacket(channel);
+
         //Handshake step 3
         if(server_packet.getType() == PacketType.SYN_ACK.getValue()) {
             String payload = new String(server_packet.getPayload(), UTF_8);
             System.out.println("Server SYN_ACK response : " + payload);
-            connection_established = true;
             sequence_number = server_packet.getSequenceNumber() + 1;
+
+            // Din't put the timeout, cuz the server doesn't send anything to back to the client.
             ack_packet(server_packet.getSequenceNumber(), channel);
+            connection_established = true;
         }
     }
 
@@ -180,6 +180,26 @@ public class UDPClient {
         System.out.println(" \nSeq # of received packet : " + seq_no);
         Packet ack_packet = createPacket(String.valueOf(seq_no), PacketType.ACK.getValue());
         channel.send(ack_packet.toBuffer(), routerAddress);
+    }
+
+    private void sends(DatagramChannel channel, Packet packet) throws IOException{
+        while(true){
+            channel.send(packet.toBuffer(), routerAddress);
+
+            // When you are using debug, you should switch to the server after send.
+            // Otherwise, it keeps thinking the packet is dropped.
+            // cuz server doesn't send anything.
+            channel.configureBlocking(false);
+            Selector selector = Selector.open();
+            channel.register(selector, OP_READ);
+            selector.select(100);
+
+            Set<SelectionKey> keys = selector.selectedKeys();
+            // Packet Not Dropped
+            if(!keys.isEmpty()){
+                break;
+            }
+        }
     }
 
     public static void main(String[] args) throws IOException {

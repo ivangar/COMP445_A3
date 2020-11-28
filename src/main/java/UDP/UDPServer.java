@@ -6,12 +6,16 @@ import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.DatagramChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.Arrays;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 
@@ -92,15 +96,6 @@ public class UDPServer {
                     if(packet.getType() == PacketType.FIN.getValue())
                         processPostRequest("post/post.txt", entity_body, response);
                      */
-                    /*
-                    Timer timer = new Timer();
-                    TimerTask task = new TimerTask() {
-                        @Override
-                        public void run() {
-
-                        }
-                    };
-                    timer.schedule(task, 0, 2000);*/
 
 
                 }
@@ -232,16 +227,33 @@ public class UDPServer {
         long seq_no = packet.getSequenceNumber() + 1;
         Packet syn_ack_response = createPacket(packet, responseMessage, seq_no, PacketType.SYN_ACK.getValue());
         System.out.println("Sending SYN_ACK message: Hi and Seq # :" + seq_no);
-        channel.send(syn_ack_response.toBuffer(), routerAddress);
+
         ByteBuffer buf = ByteBuffer
                 .allocate(Packet.MAX_LEN)
                 .order(ByteOrder.BIG_ENDIAN);
-        Packet ack_packet = receivePacket(buf, channel);
-        if(ack_packet.getType() == PacketType.ACK.getValue()) {
-            ack_packet(ack_packet);
-            connection_established = true;
-            System.out.println("\n---------Connection with client established---------\n\n");
+
+        Packet ack_packet = createPacket(packet, "", 0, 1);
+        while(true){
+            // Send SYN_ACK packet to the client.
+            sends(channel, syn_ack_response);
+            ack_packet = receivePacket(buf, channel);
+
+            if(ack_packet.getType() == PacketType.ACK.getValue()) {
+                ack_packet(ack_packet);
+                connection_established = true;
+                System.out.println("\n---------Connection with client established---------\n\n");
+                break;
+            }
         }
+
+//        if(ack_packet.getType() == PacketType.ACK.getValue()) {
+//            ack_packet(ack_packet);
+//            connection_established = true;
+//            System.out.println("\n---------Connection with client established---------\n\n");
+//        }else{
+//            System.out.println("\n---------Connection failed----------\n\n");
+//            System.exit(0);
+//        }
 
     }
 
@@ -257,6 +269,26 @@ public class UDPServer {
                 .setPayload(message.getBytes())
                 .create();
         return p;
+    }
+
+    private void sends(DatagramChannel channel, Packet packet) throws IOException{
+        while(true){
+            channel.send(packet.toBuffer(), routerAddress);
+
+            // When you are using debug, you should switch to the client after send.
+            // Otherwise, it keeps thinking the packet is dropped.
+            // cuz client doesn't send anything.
+            channel.configureBlocking(false);
+            Selector selector = Selector.open();
+            channel.register(selector, OP_READ);
+            selector.select(100);
+
+            Set<SelectionKey> keys = selector.selectedKeys();
+            // Packet Not Dropped
+            if(!keys.isEmpty()){
+                break;
+            }
+        }
     }
 
     private Packet receivePacket(ByteBuffer buf, DatagramChannel channel) throws IOException{
