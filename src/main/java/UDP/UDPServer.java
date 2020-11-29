@@ -152,27 +152,29 @@ public class UDPServer {
         ByteBuffer buf = ByteBuffer
                 .allocate(Packet.MAX_LEN)
                 .order(ByteOrder.BIG_ENDIAN);
-/*
-        while(true){
-            // Send SYN_ACK packet to the client.
-            sends(channel, syn_ack_response);
-            Packet ack_packet = receivePacket(buf, channel);
 
-            if(ack_packet.getType() == PacketType.ACK.getValue()) {
-                ack_packet(ack_packet);
-                connection_established = true;
-                System.out.println("\n---------Connection with client established---------\n\n");
-                break;
-            }
+        // Send SYN_ACK packet to the client.
+        sends(channel, syn_ack_response);
+        Packet ack_packet = receivePacket(buf, channel);
+
+        if(ack_packet.getType() == PacketType.ACK.getValue()) {
+            ack_packet(ack_packet);
+            connection_established = true;
+            System.out.println("\n---------Connection with client established---------\n\n");
         }
-        */
+        else if(ack_packet.getType() == PacketType.DATA.getValue()){
+            System.out.println("\n---------Connection failed---------\n\n");
+            System.exit(0);
+        }
+
+        /*
         Packet ack_packet = receivePacket(buf, channel);
         if(ack_packet.getType() == PacketType.ACK.getValue()) {
             ack_packet(ack_packet);
             connection_established = true;
             System.out.println("\n---------Connection with client established---------\n\n");
         }
-
+        */
     }
 
     private void ack_packet(Packet client_packet) throws IOException {
@@ -201,12 +203,14 @@ public class UDPServer {
             sends(channel,packet);
         }
 
+        selector.close();
         keys.clear();
         return;
     }
 
     private Packet receivePacket(ByteBuffer buf, DatagramChannel channel) throws IOException{
 
+        channel.configureBlocking(true);
         buf.clear();
         routerAddress = channel.receive(buf);
 

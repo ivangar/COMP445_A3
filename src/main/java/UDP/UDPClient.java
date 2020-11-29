@@ -71,6 +71,7 @@ public class UDPClient {
 
     private Packet receivePacket(DatagramChannel channel) throws IOException{
 
+        channel.configureBlocking(true);
         ByteBuffer buf = ByteBuffer.allocate(Packet.MAX_LEN).order(ByteOrder.BIG_ENDIAN);
         buf.clear();
         channel.receive(buf);
@@ -110,8 +111,8 @@ public class UDPClient {
         Packet packet1 = createPacket(helloMessage, PacketType.SYN.getValue());
 
         System.out.println("Sending SYN message with sequence number " + sequence_number);
-        channel.send(packet1.toBuffer(), routerAddress);
-        //sends(channel, packet1);
+//        channel.send(packet1.toBuffer(), routerAddress);
+        sends(channel, packet1);
 
         Packet server_packet = receivePacket(channel);
         //Handshake step 3
@@ -142,6 +143,7 @@ public class UDPClient {
             sends(channel,packet);
         }
 
+        selector.close();
         keys.clear();
         return;
     }
@@ -153,7 +155,8 @@ public class UDPClient {
     private void send_get_request(String request, DatagramChannel channel) throws IOException {
         sequence_number++;
         Packet p = createPacket(request, PacketType.DATA.getValue());
-        channel.send(p.toBuffer(), routerAddress);
+//        channel.send(p.toBuffer(), routerAddress);
+        sends(channel,p);
         Packet resp = receivePacket(channel);
 
         while(resp.getType() != PacketType.FIN.getValue()){
