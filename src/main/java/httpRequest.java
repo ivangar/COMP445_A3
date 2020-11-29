@@ -1,8 +1,11 @@
+import UDP.UDPClient;
 import java.io.*;
 import java.net.Socket;
 import java.net.URL;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 
 public class httpRequest {
@@ -23,11 +26,13 @@ public class httpRequest {
     private List<String> requestHeaders = new ArrayList<String>();
     public CmdValidation cmd_validation;
     public httpResponse response;
+    private UDPClient udp_client;
 
     public httpRequest(String[] args, CmdValidation cmd_validation){
         this.cmd_validation = cmd_validation;
         setArgs(args);
-        sendRequest();
+        udp_client = new UDPClient();
+        sendUDP_request();
     }
 
     private void setArgs(String[] args){
@@ -38,6 +43,20 @@ public class httpRequest {
         this.has_inline_data = Arrays.asList(this.args).contains("-d");
         this.has_file_data = Arrays.asList(this.args).contains("-f");
         addRequestHeaders();
+    }
+
+    private void sendUDP_request(){
+
+        try {
+            if(this.requestMethod.equalsIgnoreCase("get"))
+                getUDP_request();
+            else if(this.requestMethod.equalsIgnoreCase("post"))
+                postUDP_request();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 
     private void sendRequest(){
@@ -79,6 +98,42 @@ public class httpRequest {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private void getUDP_request() throws IOException{
+
+        this.request_url = new URL(this.args[this.args.length-1]);
+        this.host = this.request_url.getHost();
+        this.portNumber = (this.request_url.getPort() == -1) ? this.request_url.getDefaultPort() : this.request_url.getPort(); //If the port number is not specified it returns -1
+        this.request_URI = request_url.getFile();  //gets the path + query if there is one
+        this.response = new httpResponse(this.args);
+
+        String req = getRequestData();
+        udp_client.runClient(req, requestMethod);
+
+        BufferedReader bufReader = new BufferedReader(new StringReader(udp_client.get_response()));
+        this.response.printHttpResponse(bufReader);
+
+    }
+
+    private void postUDP_request() throws IOException{
+
+        this.request_url = new URL(this.args[this.args.length-1]);
+        this.host = this.request_url.getHost();
+        this.portNumber = (this.request_url.getPort() == -1) ? this.request_url.getDefaultPort() : this.request_url.getPort(); //If the port number is not specified it returns -1
+        this.request_URI = request_url.getFile();  //gets the path + query if there is one
+        this.response = new httpResponse(this.args);
+
+        String req = postRequestData();
+        udp_client.runClient(req, requestMethod);
+
+        BufferedReader bufReader = new BufferedReader(new StringReader(udp_client.get_response()));
+        this.response.printHttpResponse(bufReader);
+
+    }
+
+    public String getRequestMethod(){
+        return this.requestMethod;
     }
 
     private void get_request() throws IOException{
@@ -205,6 +260,52 @@ public class httpRequest {
         for (String header : this.requestHeaders) {
             this.writer.println(header);
         }
+    }
+
+    private String getRequestData(){
+
+
+        StringBuilder requestData = new StringBuilder("GET " + this.request_URI + " HTTP/1.0\r\n" + "Host: " + this.host +
+                "\r\nConnection: keep-alive\r\n");
+
+        if(this.has_headers){
+            for (String header : this.requestHeaders) {
+                requestData.append(header).append("\r\n");
+            }
+        }
+        else {
+            requestData.append("User-Agent:COMP445").append("\r\n");
+            requestData.append("Accept-Language:en-US").append("\r\n");
+        }
+
+        requestData.append("\r\n");
+
+        return requestData.toString();
+    }
+
+    private String postRequestData(){
+
+        String data = getData();
+        StringBuilder requestData = new StringBuilder("POST " + this.request_URI + " HTTP/1.0\r\n" + "Host: " + this.host +
+                "\r\nContent-Length: " + data.length() + "\r\nConnection: keep-alive\r\n");
+
+        if(this.has_headers){
+            for (String header : this.requestHeaders) {
+                requestData.append(header).append("\r\n");
+            }
+        }
+        else {
+            requestData.append("User-Agent:COMP445").append("\r\n");
+            requestData.append("Accept-Language:en-US").append("\r\n");
+        }
+
+        requestData.append("\r\n");
+
+        if(this.has_inline_data || this.has_file_data)
+            requestData.append(data).append("\r\n\r\n");
+
+
+        return requestData.toString();
     }
 
 }

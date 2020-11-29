@@ -1,3 +1,6 @@
+import UDP.httpfsLibrary;
+
+import UDP.*;
 import java.net.Socket;
 import java.net.ServerSocket;
 import java.util.*;
@@ -13,18 +16,25 @@ import java.io.*;
 
 public class httpfs {
 
+    private UDPServer server;
     private static int serverPort;
 
-    public static void main(String[] args){
+    public static void main(String[] args) throws IOException {
 
         setServerPort(args);
         printHelp(args);
-        new httpfs().runServer(args);
+        new httpfs().runUDP_Server(args);
 
     }
 
+    public void runUDP_Server(String[] args) throws IOException {
+        server = new UDPServer();
+        server.setServer(serverPort);
+        server.listenAndServe(args);
+    }
+
     /**
-     * Generates a ServerSocket with try-with-resources, waits for client Socket and uses httpfsLibrary to
+     * Generates a ServerSocket with try-with-resources, waits for client Socket and uses UDP.httpfsLibrary to
      * process and handle client requests and return a response back. It listens infinitely in a loop until
      * process is killed
      * @param args arguments passed from terminal
@@ -38,7 +48,7 @@ public class httpfs {
                 Socket client = server.accept();
 
                 System.out.println();
-                System.out.println("Client and Server are connected from httpfsLibrary.");
+                System.out.println("Client and Server are connected from UDP.httpfsLibrary.");
                 System.out.println("---------------------- Http Client Request ----------------------------");
 
                 httpfsLibrary httpfsLib = new httpfsLibrary(args, client);
@@ -60,7 +70,7 @@ public class httpfs {
     private static void setServerPort(String[] args){
         int findP = Arrays.asList(args).indexOf("-p");
         if(findP == -1){
-            serverPort = 8080;
+            serverPort = 8007;
         }
         else
             serverPort = Integer.parseInt(args[findP+1]);
