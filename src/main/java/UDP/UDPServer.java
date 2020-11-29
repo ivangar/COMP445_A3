@@ -6,10 +6,13 @@ import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.DatagramChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 
+import static java.nio.channels.SelectionKey.OP_READ;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 
@@ -149,6 +152,20 @@ public class UDPServer {
         ByteBuffer buf = ByteBuffer
                 .allocate(Packet.MAX_LEN)
                 .order(ByteOrder.BIG_ENDIAN);
+/*
+        while(true){
+            // Send SYN_ACK packet to the client.
+            sends(channel, syn_ack_response);
+            Packet ack_packet = receivePacket(buf, channel);
+
+            if(ack_packet.getType() == PacketType.ACK.getValue()) {
+                ack_packet(ack_packet);
+                connection_established = true;
+                System.out.println("\n---------Connection with client established---------\n\n");
+                break;
+            }
+        }
+        */
         Packet ack_packet = receivePacket(buf, channel);
         if(ack_packet.getType() == PacketType.ACK.getValue()) {
             ack_packet(ack_packet);
@@ -170,6 +187,22 @@ public class UDPServer {
                 .setPayload(message.getBytes())
                 .create();
         return p;
+    }
+
+    private void sends(DatagramChannel channel, Packet packet) throws IOException{
+        channel.send(packet.toBuffer(), routerAddress);
+        channel.configureBlocking(false);
+        Selector selector = Selector.open();
+        channel.register(selector, OP_READ);
+        selector.select(100);
+
+        Set<SelectionKey> keys = selector.selectedKeys();
+        if (keys.isEmpty()) {
+            sends(channel,packet);
+        }
+
+        keys.clear();
+        return;
     }
 
     private Packet receivePacket(ByteBuffer buf, DatagramChannel channel) throws IOException{

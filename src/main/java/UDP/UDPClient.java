@@ -111,6 +111,7 @@ public class UDPClient {
 
         System.out.println("Sending SYN message with sequence number " + sequence_number);
         channel.send(packet1.toBuffer(), routerAddress);
+        //sends(channel, packet1);
 
         Packet server_packet = receivePacket(channel);
         //Handshake step 3
@@ -127,6 +128,22 @@ public class UDPClient {
         System.out.println(" \nSeq # of received packet : " + seq_no);
         Packet ack_packet = createPacket(String.valueOf(seq_no), PacketType.ACK.getValue());
         channel.send(ack_packet.toBuffer(), routerAddress);
+    }
+
+    private void sends(DatagramChannel channel, Packet packet) throws IOException{
+        channel.send(packet.toBuffer(), routerAddress);
+        channel.configureBlocking(false);
+        Selector selector = Selector.open();
+        channel.register(selector, OP_READ);
+        selector.select(100);
+
+        Set<SelectionKey> keys = selector.selectedKeys();
+        if (keys.isEmpty()) {
+            sends(channel,packet);
+        }
+
+        keys.clear();
+        return;
     }
 
     public String get_response(){
