@@ -141,7 +141,7 @@ public class httpRequest {
 
         this.writer.println("GET " + this.request_URI + " HTTP/1.0");
         this.writer.println("Host: " + this.host);
-        this.writer.println("Connection: keep-alive");  //important to close the connection with server after receiving the response
+        this.writer.println("Connection: close");  //important to close the connection with server after receiving the response
 
         //Check for all the headers passed from console
         if(this.has_headers)

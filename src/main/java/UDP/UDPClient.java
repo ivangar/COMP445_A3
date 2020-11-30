@@ -22,12 +22,21 @@ public class UDPClient {
     private long sequence_number;
     private StringBuilder response = new StringBuilder();
 
+    /**
+     * Constructor for the UDPClient class. Sets the router and server ports.
+     * Sets the client port
+     */
     public UDPClient(){
         setRouter("localhost", 3000);
         setServer("localhost", 8007);
         setClientAddress(41830);
     }
 
+    /**
+     * Creates the UDP Channel connection, handshake protocol and sends the requests on behalf of the client library
+     * @param request String representing the HTTP request (post or get).
+     * @param requestMethod String for the HTTP method
+     */
     public void runClient(String request, String requestMethod) throws IOException {
         try(DatagramChannel channel = DatagramChannel.open()){
             channel.bind(clientAddress);
@@ -46,18 +55,38 @@ public class UDPClient {
         }
     }
 
+    /**
+     * Sets the router port and address
+     * @param routerHost String representing the router local address.
+     * @param routerPort String for the router port
+     */
     public static void setRouter(String routerHost, int routerPort){
         routerAddress = new InetSocketAddress(routerHost, routerPort);
     }
 
+    /**
+     * Sets the server port and address
+     * @param serverHost String representing the server local address.
+     * @param serverPort String for the server port
+     */
     public static void setServer(String serverHost, int serverPort){
         serverAddress = new InetSocketAddress(serverHost, serverPort);
     }
 
+    /**
+     * Sets the client port
+     * @param clientPort String representing the client port
+     */
     public static void setClientAddress(int clientPort){
         clientAddress = new InetSocketAddress(clientPort);
     }
 
+    /**
+     * Creates a UDP Packet object
+     * @param message String the message or payload of the packet
+     * @param type type of packet
+     * @return Packet object
+     */
     private Packet createPacket(String message, int type){
         Packet p = new Packet.Builder()
                 .setType(type)
@@ -69,6 +98,11 @@ public class UDPClient {
         return p;
     }
 
+    /**
+     * Receives a Datagram Bytebuffer and returns a new Packet
+     * @param channel DatagramChannel object
+     * @return Packet object
+     */
     private Packet receivePacket(DatagramChannel channel) throws IOException{
 
         channel.configureBlocking(true);
@@ -85,6 +119,12 @@ public class UDPClient {
         return packet;
     }
 
+    /**
+     * Segments the payload into chunks of 1013 bytes each
+     * @param response HTTP response message
+     * @param payload_size size of the response
+     * @return List<byte[]> a list of byte objects representing each Packet's payload
+     */
     public static List<byte[]> getPayloads(byte[] response, int payload_size) {
 
         List<byte[]> payloads = new ArrayList<byte[]>();
@@ -99,6 +139,10 @@ public class UDPClient {
         return payloads;
     }
 
+    /**
+     * simulation of 3-way handshake similar to TCP protocol
+     * @param channel DatagramChannel object
+     */
     private void handShake(DatagramChannel channel) throws IOException {
 
         System.out.println("\n---------Establishing connection with server through 3-way handshake---------\n");
@@ -111,7 +155,7 @@ public class UDPClient {
         Packet packet1 = createPacket(helloMessage, PacketType.SYN.getValue());
 
         System.out.println("Sending SYN message with sequence number " + sequence_number);
-//        channel.send(packet1.toBuffer(), routerAddress);
+        //channel.send(packet1.toBuffer(), routerAddress);
         sends(channel, packet1);
 
         Packet server_packet = receivePacket(channel);
@@ -125,18 +169,28 @@ public class UDPClient {
         }
     }
 
+    /**
+     * Creates an ACK packet for the received packet and sends it to UDP Server
+     * @param seq_no sequence number of the received packet
+     * @param channel DatagramChannel object
+     */
     private void ack_packet(long seq_no, DatagramChannel channel) throws IOException {
         System.out.println(" \nSeq # of received packet : " + seq_no);
         Packet ack_packet = createPacket(String.valueOf(seq_no), PacketType.ACK.getValue());
         channel.send(ack_packet.toBuffer(), routerAddress);
     }
 
+    /**
+     * Sends a Packet with Selector timer, recursively sends after timeout
+     * @param packet Packet to be sent
+     * @param channel DatagramChannel object
+     */
     private void sends(DatagramChannel channel, Packet packet) throws IOException{
         channel.send(packet.toBuffer(), routerAddress);
         channel.configureBlocking(false);
         Selector selector = Selector.open();
         channel.register(selector, OP_READ);
-        selector.select(100);
+        selector.select(1000);
 
         Set<SelectionKey> keys = selector.selectedKeys();
         if (keys.isEmpty()) {
@@ -148,14 +202,23 @@ public class UDPClient {
         return;
     }
 
+    /**
+     * Gets the HTTP response data from Server
+     * @return HTTP response string
+     */
     public String get_response(){
         return this.response.toString();
     }
 
+    /**
+     * Sends the get request Packets to Server
+     * @param request string representing the HTTP Request
+     * @param channel DatagramChannel object
+     */
     private void send_get_request(String request, DatagramChannel channel) throws IOException {
         sequence_number++;
         Packet p = createPacket(request, PacketType.DATA.getValue());
-//        channel.send(p.toBuffer(), routerAddress);
+        //channel.send(p.toBuffer(), routerAddress);
         sends(channel,p);
         Packet resp = receivePacket(channel);
 
@@ -167,6 +230,11 @@ public class UDPClient {
         }
     }
 
+    /**
+     * Sends the post request Packets to Server
+     * @param request string representing the HTTP Request
+     * @param channel DatagramChannel object
+     */
     private void send_post_request(String request, DatagramChannel channel) throws IOException {
         sequence_number++;
         byte[] responseBytes = request.getBytes(UTF_8);
